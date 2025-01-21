@@ -1,10 +1,13 @@
 // Mitt projekt för att skapa ett password lock
 #include <EEPROM.h>
+#include <Servo.h>
 
+Servo myServo;
 
 const int buttonPins[] = {2, 3, 4, 5};
 const int programButtonPin = 6;
 const int piezoPin = 7;
+const int servoPin = 9;
 
 int inputCode[4];
 int storedCode[4];
@@ -20,6 +23,8 @@ Mode currentMode = NORMAL;
 
 void setup() {
   Serial.begin(9600);
+  myServo.attach(servoPin);
+  myServo.write(0);
 
   for (int i = 0; i < 4; i++) {
     pinMode(buttonPins[i], INPUT_PULLUP);
@@ -99,6 +104,8 @@ void handleCodeEntry() {
     if (checkCode()) {
       Serial.println("Rätt kod!");
       failedAttempts = 0;
+
+      myServo.write(90);
     } else {
       Serial.println("Fel kod, försök igen!");
       failedAttempts++;
@@ -181,12 +188,14 @@ bool checkCode() {
 void activatePiezo() {
   Serial.println("Fel 3 gånger! Aktiverar piezo.");
   for (int i = 0; i < 3; i++) {
-    tone(1000);
+    tone(piezoPin, 1000);
     delay(500);
     noTone(piezoPin);
     delay(500);
   }
 }
+
+
 
 
 
