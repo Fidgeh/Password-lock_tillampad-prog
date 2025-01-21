@@ -4,12 +4,19 @@
 
 const int buttonPins[] = {2, 3, 4, 5};
 const int programButtonPin = 6;
+const int piezoPin = 7;
 
 int inputCode[4];
 int storedCode[4];
 int inputIndex = 0;
 bool codeMatched = false;
 bool codeSet = false;
+
+int failedAttempts = 0;
+const int maxFailedAttempts = 3;
+
+enum Mode { NORMAL, VERIFYING, PROGRAMMING };
+Mode currentMode = NORMAL;
 
 void setup() {
   Serial.begin(9600);
@@ -18,6 +25,8 @@ void setup() {
     pinMode(buttonPins[i], INPUT_PULLUP);
   }
   pinMode(programButtonPin, INPUT_PULLUP);
+  pinMode(piezoPin, OUTPUT);
+  digitalWrite(piezoPin, LOW);
 
   if (EEPROM.read(0) != 0xFF) {
     for (int i = 0; i < 4; i++) {
@@ -29,28 +38,54 @@ void setup() {
     Serial.println("Ingen kid hittad. Du måste sätta en kod.");
   }
 
-  if (digitalRead(programButtonPin) == LOW) {
-    Serial.println("Programmeringsläge aktiverat: Mata in ny kod.");
+    if (!codeSet) {
+    Serial.println("Startar i programmeringsläge för att sätta en ny kod.");
+    currentMode = PROGRAMMING;
     setNewCode();
   } else {
-    if (!codeSet) {
-      Serial.println("Ingen kod är satt. Starta om och håll nere programmeringsknappen.");
-    } else {
-      Serial.println("Normalläge: mata in den lagrade koden med knapparna.");
-    }
+    Serial.println("Normalläge: Mata in den lagrade koden med knapparna.");
   }
+
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
-  if (!codeSet) {
-    return;
+  switch (currentMode) {
+    case NORMAL:
+      if (digitalRead(programButtonPin) == LOW) {
+        delay(200);
+        Serial.println("Programmeringsknapp tryckt. Ange befintlig kod för att byta kod.");
+        currentMode = VERIFYING;
+        inputIndex = 0;
+      } else {
+        handleCodeEntry();
+      }
+      break;
+
+    case VERIFYING:
+      if (readInputCode()) {
+        if (checkCode()) {
+          Serial.println("Korrekt kod. Gå in i programmeringsläge.");
+          currentMode = PROGRAMMING;
+          setNewCode();
+          currentMode = NORMAL;
+          Serial.println("Återvänder till normalläge.");
+        } else {
+          Serial.println("Fel kod. Återvänder till normalläge.");
+          currentMode = NORMAL;
+        }
+      }
+      break;
+    
+    case PROGRAMMING:
+      break;
   }
-  
+}
+
+
+void handleCodeEntry() {
   for (int i = 0; i < 4; i++) {
     if (digitalRead(buttonPins[i]) == LOW) {
       delay(200);
-
       if (inputIndex < 4) {
         inputCode[inputIndex] = i + 1;
         inputIndex++;
@@ -61,27 +96,56 @@ void loop() {
   }
 
   if (inputIndex >= 4) {
-    checkCode();
+    if (checkCode()) {
+      Serial.println("Rätt kod!");
+      failedAttempts = 0;
+    } else {
+      Serial.println("Fel kod, försök igen!");
+      failedAttempts++;
+      if (failedAttempts >= maxFailedAttempts) {
+        activatePiezo();
+        failedAttempts = 0;
+      }
+    }
     inputIndex = 0;
   }
 
 }
 
-// funktion för att skapa en ny kod
+
+bool readInputCode() {
+  while (inputIndex < 4) {
+    for (int i = 0; i < 4; i++) {
+      if (digitalRead(buttonPins[i]) == LOW) {
+        delay(200);
+        inputCode[inputIndex] = i + 1;
+        inputIndex++;
+        Serial.print("Inmatad siffra: ");
+        Serial.println(i + 1);
+        if (inputIndex >= 4) {
+          break;
+        }
+      }
+    }
+  }
+  return true;
+}
 
 
 void setNewCode() {
   int newCode[4];
   int newCodeIndex = 0;
 
+  Serial.println("Mata in den nya koden:");
+
   while (newCodeIndex < 4) {
     for (int i = 0; i < 4; i++) {
       if (digitalRead(buttonPins[i]) == LOW) {
         delay(200);
         newCode[newCodeIndex] = i + 1;
+        newCodeIndex++;
         Serial.print("Ny kodsiffra: ");
         Serial.println(i + 1);
-        newCodeIndex++;
         if (newCodeIndex >= 4) {
           break;
         }
@@ -98,7 +162,7 @@ void setNewCode() {
 }
 
 
-void checkCode() {
+bool checkCode() {
   codeMatched = true;
   for (int i = 0; i < 4; i++) {
     if (inputCode[i] != storedCode[i]) {
@@ -107,12 +171,23 @@ void checkCode() {
     }
   }
   if (codeMatched) {
-    Serial.println("Rätt kod!");
+    return true;
   } else {
-    Serial.println("Fel kod, försök igen!");
+    return false;
   }
     
 }
-// funktion för att skriva in och kolla om lösenordet är rätt
 
-// funktion för att öppna dörr
+void activatePiezo() {
+  Serial.println("Fel 3 gånger! Aktiverar piezo.");
+  for (int i = 0; i < 3; i++) {
+    tone(1000);
+    delay(500);
+    noTone(piezoPin);
+    delay(500);
+  }
+}
+
+
+
+
