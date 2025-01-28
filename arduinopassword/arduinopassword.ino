@@ -5,7 +5,7 @@
 Servo myServo;
 
 const int buttonPins[] = {2, 3, 4, 5};
-const int programButtonPin = 6;
+const int changeCodeButtonPin = 6;
 const int piezoPin = 7;
 const int servoPin = 9;
 
@@ -14,6 +14,7 @@ int storedCode[4];
 int inputIndex = 0;
 bool codeMatched = false;
 bool codeSet = false;
+bool lockOpen = false;
 
 int failedAttempts = 0;
 const int maxFailedAttempts = 3;
@@ -29,7 +30,7 @@ void setup() {
   for (int i = 0; i < 4; i++) {
     pinMode(buttonPins[i], INPUT_PULLUP);
   }
-  pinMode(programButtonPin, INPUT_PULLUP);
+  pinMode(changeCodeButtonPin, INPUT_PULLUP);
   pinMode(piezoPin, OUTPUT);
   digitalWrite(piezoPin, LOW);
 
@@ -56,7 +57,7 @@ void setup() {
 void loop() {
   switch (currentMode) {
     case NORMAL:
-      if (digitalRead(programButtonPin) == LOW) {
+      if (digitalRead(changeCodeButtonPin) == LOW) {
         delay(200);
         Serial.println("Programmeringsknapp tryckt. Ange befintlig kod för att byta kod.");
         currentMode = VERIFYING;
@@ -104,8 +105,15 @@ void handleCodeEntry() {
     if (checkCode()) {
       Serial.println("Rätt kod!");
       failedAttempts = 0;
-
-      myServo.write(90);
+      if (lockOpen == false) {
+        myServo.write(90);
+        lockOpen = true;
+      
+      } else if (lockOpen == true) {
+        myServo.write(0);
+        lockOpen = false;
+      }
+      
     } else {
       Serial.println("Fel kod, försök igen!");
       failedAttempts++;
