@@ -1,4 +1,15 @@
-// Mitt projekt för att skapa ett password lock
+/*
+File: arduinopassword
+
+
+*/
+
+/*
+EEPROM stores a password without a continuos power supply. Servo is the motor used for the lock.
+Here I define my variables.
+
+*/
+
 #include <EEPROM.h>
 #include <Servo.h>
 
@@ -19,14 +30,26 @@ bool lockOpen = false;
 int failedAttempts = 0;
 const int maxFailedAttempts = 3;
 
-enum Mode { NORMAL, VERIFYING, PROGRAMMING };
+// Creates "Mode" which has three different possible values. Is used to let the program know what mode it is in.
+enum Mode { NORMAL, VERIFYING, CODE_CHANGE };
 Mode currentMode = NORMAL;
 
+
+/*
+
+Define INPUT/OUTPUT for pins. 
+Puts Servo at 0 degrees.
+Checks if a code is Stored in the EEPROM memory.
+
+*/
 void setup() {
   Serial.begin(9600);
   myServo.attach(servoPin);
   myServo.write(0);
 
+  
+
+  // Pins 1-4 become INPUT.
   for (int i = 0; i < 4; i++) {
     pinMode(buttonPins[i], INPUT_PULLUP);
   }
@@ -34,32 +57,46 @@ void setup() {
   pinMode(piezoPin, OUTPUT);
   digitalWrite(piezoPin, LOW);
 
+  // Checks if there is something stored in first position of EEPROM. If something is stored the first 4 positions will be stored in storedCode.
   if (EEPROM.read(0) != 0xFF) {
     for (int i = 0; i < 4; i++) {
       storedCode[i] = EEPROM.read(i);
     }
     codeSet = true;
-    Serial.println("Kod hittad i EEPROM.");
+    Serial.println("Code found in EEPROM.");
   } else {
-    Serial.println("Ingen kid hittad. Du måste sätta en kod.");
+    Serial.println("No code found. You have to enter a code");
   }
 
-    if (!codeSet) {
-    Serial.println("Startar i programmeringsläge för att sätta en ny kod.");
-    currentMode = PROGRAMMING;
+  for (int i = 0; i < 4; i++) {
+  Serial.print(storedCode[i]);
+  Serial.print(" ");
+}
+Serial.println();
+
+  // lets you put in a new code if no code was found in EEPROM memory.  
+  if (!codeSet) {
+    Serial.println("Entering Code Change mode. Enter a code.");
+    currentMode = CODE_CHANGE;
     setNewCode();
   } else {
-    Serial.println("Normalläge: Mata in den lagrade koden med knapparna.");
+    Serial.println("Normal mode: Enter code:");
   }
 
 }
 
+
+/*
+Starts void loop.
+Checks if the code change button is being pressed. 
+
+*/
 void loop() {
   switch (currentMode) {
     case NORMAL:
       if (digitalRead(changeCodeButtonPin) == LOW) {
         delay(200);
-        Serial.println("Programmeringsknapp tryckt. Ange befintlig kod för att byta kod.");
+        Serial.println("Code change button pressed. Entering Code change mode.");
         currentMode = VERIFYING;
         inputIndex = 0;
       } else {
@@ -67,11 +104,12 @@ void loop() {
       }
       break;
 
+    // in the VERIFYING mode 
     case VERIFYING:
       if (readInputCode()) {
         if (checkCode()) {
-          Serial.println("Korrekt kod. Gå in i programmeringsläge.");
-          currentMode = PROGRAMMING;
+          Serial.println("Correct code.");
+          currentMode = CODE_CHANGE;
           setNewCode();
           currentMode = NORMAL;
           Serial.println("Återvänder till normalläge.");
@@ -82,7 +120,7 @@ void loop() {
       }
       break;
     
-    case PROGRAMMING:
+    case CODE_CHANGE:
       break;
   }
 }
