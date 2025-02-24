@@ -1,6 +1,6 @@
 /*
 File: arduinopassword
-
+Name: Figge Hellstrom
 
 */
 
@@ -104,7 +104,7 @@ void loop() {
       }
       break;
 
-    // in the VERIFYING mode 
+    // in the VERIFYING mode. Checking if code is correct so that code can be changed.
     case VERIFYING:
       if (readInputCode()) {
         if (checkCode()) {
@@ -112,9 +112,9 @@ void loop() {
           currentMode = CODE_CHANGE;
           setNewCode();
           currentMode = NORMAL;
-          Serial.println("Återvänder till normalläge.");
+          Serial.println("Returning to normal mode:");
         } else {
-          Serial.println("Fel kod. Återvänder till normalläge.");
+          Serial.println("Wrong code. Returning to normal mode:");
           currentMode = NORMAL;
         }
       }
@@ -125,7 +125,7 @@ void loop() {
   }
 }
 
-
+// Handels the code entry by checking if the buttons are being pressed.
 void handleCodeEntry() {
   for (int i = 0; i < 4; i++) {
     if (digitalRead(buttonPins[i]) == LOW) {
@@ -133,27 +133,29 @@ void handleCodeEntry() {
       if (inputIndex < 4) {
         inputCode[inputIndex] = i + 1;
         inputIndex++;
-        Serial.print("Siffra inmatad: ");
+        Serial.print("Number entered: ");
         Serial.println(i + 1);
       }
     }
   }
-
+  // Checks if code matches stored code when 4 digits have been entered.
   if (inputIndex >= 4) {
     if (checkCode()) {
-      Serial.println("Rätt kod!");
+      Serial.println("Correct!");
       failedAttempts = 0;
+      // opens lock if it is closed
       if (lockOpen == false) {
         myServo.write(90);
         lockOpen = true;
-      
+        // closes lock if it is open.
       } else if (lockOpen == true) {
         myServo.write(0);
         lockOpen = false;
       }
       
+      // Prints wrong code if the digits do not match the stored code.
     } else {
-      Serial.println("Fel kod, försök igen!");
+      Serial.println("Wrong Code! Try again.");
       failedAttempts++;
       if (failedAttempts >= maxFailedAttempts) {
         activatePiezo();
@@ -165,7 +167,7 @@ void handleCodeEntry() {
 
 }
 
-
+// Reads the password by checking button presses. Stops reading if 4 digits have been entered.
 bool readInputCode() {
   while (inputIndex < 4) {
     for (int i = 0; i < 4; i++) {
@@ -173,7 +175,7 @@ bool readInputCode() {
         delay(200);
         inputCode[inputIndex] = i + 1;
         inputIndex++;
-        Serial.print("Inmatad siffra: ");
+        Serial.print("Entered digit: ");
         Serial.println(i + 1);
         if (inputIndex >= 4) {
           break;
@@ -184,12 +186,12 @@ bool readInputCode() {
   return true;
 }
 
-
+// Function for setting a new password and storing it in EEPROM.
 void setNewCode() {
   int newCode[4];
   int newCodeIndex = 0;
 
-  Serial.println("Mata in den nya koden:");
+  Serial.println("Enter new password");
 
   while (newCodeIndex < 4) {
     for (int i = 0; i < 4; i++) {
@@ -197,7 +199,7 @@ void setNewCode() {
         delay(200);
         newCode[newCodeIndex] = i + 1;
         newCodeIndex++;
-        Serial.print("Ny kodsiffra: ");
+        Serial.print("New number: ");
         Serial.println(i + 1);
         if (newCodeIndex >= 4) {
           break;
@@ -205,16 +207,16 @@ void setNewCode() {
       }
     }
   }
-
+  // storing the password in EEPROM.
   for (int i = 0; i < 4; i++) {
     EEPROM.write(i, newCode[i]);
     storedCode[i] = newCode[i];
   }
   codeSet = true;
-  Serial.println("Ny kod satt och sparad i EEPROM.");
+  Serial.println("New password saved in EEPROM!");
 }
 
-
+// Checks if the entered password matches the stored password.
 bool checkCode() {
   codeMatched = true;
   for (int i = 0; i < 4; i++) {
@@ -231,8 +233,9 @@ bool checkCode() {
     
 }
 
+// Function that activates a piezo if the password is wrong 3 times in a row.
 void activatePiezo() {
-  Serial.println("Fel 3 gånger! Aktiverar piezo.");
+  Serial.println("Wrong password three times! Activating piezo!");
   for (int i = 0; i < 3; i++) {
     tone(piezoPin, 1000);
     delay(500);
